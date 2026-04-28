@@ -1,0 +1,20 @@
+services:
+  dashboard:
+    build: .
+    image: cadprev-pipeline:latest
+    container_name: cadprev-dashboard
+    restart: unless-stopped
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./data:/app/data
+      - ./results:/app/results
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8050')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
