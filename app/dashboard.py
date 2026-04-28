@@ -1,8 +1,6 @@
 """
 dashboard.py — Crítica da Base Cadastral EFPC
-Plotly Dash 4.x — uses dcc.Location for navigation (recommended in Dash 4)
-Run:    python app/dashboard.py
-Docker: gunicorn "app.dashboard:server" --bind 0.0.0.0:8050
+Plotly Dash 4.x — dcc.Location routing
 """
 
 import sys, os
@@ -36,17 +34,26 @@ ALL_ISSUES = pd.concat([ISS_A, ISS_S, ISS_D], ignore_index=True)
 SUMM       = population_summary(DF_A, DF_S, DF_D)
 REF        = pd.Timestamp("2024-12-31")
 
-# ── Theme ─────────────────────────────────────────────────────────────────────
-L = dict(
-    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+# ── Base theme (no yaxis — set per chart to avoid conflicts) ──────────────────
+BASE = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="DM Sans, sans-serif", color="#8b949e", size=11),
     margin=dict(l=12, r=12, t=28, b=12),
-    xaxis=dict(showgrid=False, zeroline=False,
-               tickfont=dict(color="#8b949e", size=10), linecolor="#21262d"),
-    yaxis=dict(showgrid=True, gridcolor="#21262d", zeroline=False,
-               tickfont=dict(color="#8b949e", size=10)),
     legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=11)),
 )
+
+XAXIS = dict(showgrid=False, zeroline=False,
+             tickfont=dict(color="#8b949e", size=10), linecolor="#21262d")
+YAXIS = dict(showgrid=True, gridcolor="#21262d", zeroline=False,
+             tickfont=dict(color="#8b949e", size=10))
+YAXIS_H = dict(autorange="reversed", showgrid=False,   # for horizontal bars
+               tickfont=dict(color="#e6edf3", size=10), linecolor="#21262d")
+
+def layout(height=260, xtitle="", ytitle="", horizontal=False):
+    return dict(**BASE, height=height,
+                xaxis={**XAXIS, "title": xtitle},
+                yaxis={**(YAXIS_H if horizontal else YAXIS), "title": ytitle})
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def ages(df):
@@ -76,7 +83,7 @@ def badge(text, cls):
 def G(fig):
     return dcc.Graph(figure=fig, config={"displayModeBar": False})
 
-# ── Pages ─────────────────────────────────────────────────────────────────────
+# ── Routes ────────────────────────────────────────────────────────────────────
 PAGES = [
     ("/",               "📊", "Visão Geral"),
     ("/inconsistencias","🔍", "Inconsistências"),
@@ -90,7 +97,7 @@ app    = Dash(__name__, assets_folder="assets",
               title="Crítica Cadastral EFPC")
 server = app.server
 
-def make_sidebar(current):
+def sidebar(current):
     return html.Div([
         html.Div([
             html.Div("CRÍTICA CADASTRAL", className="logo-title"),
@@ -98,19 +105,15 @@ def make_sidebar(current):
         ], className="sidebar-logo"),
         html.Div([
             html.Div("Análise", className="nav-section-label"),
-            *[
-                dcc.Link(
-                    [html.Span(icon, className="nav-icon"), label],
-                    href=href,
-                    className="nav-link active" if current == href else "nav-link",
-                    style={"textDecoration": "none"},
-                )
-                for href, icon, label in PAGES
-            ],
+            *[dcc.Link(
+                [html.Span(icon, className="nav-icon"), label],
+                href=href,
+                className="nav-link active" if current == href else "nav-link",
+                style={"textDecoration":"none"},
+            ) for href, icon, label in PAGES],
         ], className="nav-section"),
         html.Div([
-            html.Div(f"Ativos: {SUMM['n_ativos']:,}",
-                     style={"marginBottom":"4px"}),
+            html.Div(f"Ativos: {SUMM['n_ativos']:,}",    style={"marginBottom":"4px"}),
             html.Div(f"Assistidos: {SUMM['n_assistidos']:,}"),
             html.Div(f"Diferidos: {SUMM['n_diferidos']:,}"),
             html.Div("Resolução PREVIC 7/2022",
@@ -121,29 +124,24 @@ def make_sidebar(current):
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
     html.Div([
-        html.Div(id="sidebar"),
+        html.Div(id="sidebar-slot"),
         html.Div(id="content", className="main-content"),
     ], className="app-shell"),
 ], style={"background":"#0d1117","minHeight":"100vh"})
 
-
 @app.callback(
-    Output("sidebar", "children"),
-    Output("content", "children"),
+    Output("sidebar-slot", "children"),
+    Output("content",      "children"),
     Input("url", "pathname"),
 )
 def route(pathname):
     path = pathname or "/"
-    sidebar = make_sidebar(path)
-    if path in ("/", ""):
-        return sidebar, _overview()
-    if path == "/inconsistencias":
-        return sidebar, _issues()
-    if path == "/ativos":
-        return sidebar, _ativos()
-    if path == "/assistidos":
-        return sidebar, _assistidos()
-    return sidebar, html.Div("Página não encontrada")
+    sb   = sidebar(path)
+    if path in ("/", ""):    return sb, _overview()
+    if path == "/inconsistencias": return sb, _issues()
+    if path == "/ativos":    return sb, _ativos()
+    if path == "/assistidos":return sb, _assistidos()
+    return sb, html.Div("Página não encontrada")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -164,27 +162,28 @@ def _overview():
         text=freq["n"], textposition="outside",
         textfont=dict(size=10, color="#e6edf3"),
     ))
-    fig_bar.update_layout(**L, height=260, yaxis_title="Ocorrências")
+    fig_bar.update_layout(**layout(260, ytitle="Ocorrências"))
 
     fig_donut = go.Figure(go.Pie(
         labels=["Ativos","Assistidos","Diferidos"],
-        values=[SUMM["n_ativos"], SUMM["n_assistidos"], SUMM["n_diferidos"]],
+        values=[SUMM["n_ativos"],SUMM["n_assistidos"],SUMM["n_diferidos"]],
         hole=0.65,
         marker=dict(colors=["#388bfd","#3fb950","#d29922"]),
         textinfo="label+percent",
         textfont=dict(size=11, color="#e6edf3"),
     ))
-    fig_donut.update_layout(**L, height=260, showlegend=False)
+    fig_donut.update_layout(**BASE, height=260, showlegend=False)
     fig_donut.add_annotation(
-        text=f"<b>{SUMM['n_total']:,}</b><br><span style='font-size:10px'>participantes</span>",
+        text=(f"<b>{SUMM['n_total']:,}</b><br>"
+              f"<span style='font-size:10px'>participantes</span>"),
         x=0.5, y=0.5, showarrow=False,
         font=dict(size=14, color="#e6edf3"), align="center",
     )
 
     notice_cls = "notice-crit" if n_crit > 0 else "notice-info"
     notice_txt = (
-        f"⛔  {n_crit} inconsistências CRÍTICAS — registros devem ser corrigidos "
-        f"antes da avaliação atuarial (Ref: CPA 017/2019 IBA, Art. 4.2)."
+        f"⛔  {n_crit} inconsistências CRÍTICAS — devem ser corrigidas antes da "
+        f"avaliação atuarial (CPA 017/2019 IBA, Art. 4.2)."
         if n_crit > 0 else "✅ Nenhuma inconsistência crítica."
     )
 
@@ -200,7 +199,7 @@ def _overview():
             kpi("Ativos",         f"{SUMM['n_ativos']:,}",     "blue"),
             kpi("Assistidos",     f"{SUMM['n_assistidos']:,}", "ok"),
             kpi("Diferidos",      f"{SUMM['n_diferidos']:,}"),
-            kpi("CRÍTICOS",       f"{n_crit:,}",  "crit",
+            kpi("CRÍTICOS",       f"{n_crit:,}", "crit",
                 delta=f"{n_crit/total*100:.1f}% do total" if total else ""),
             kpi("ALERTAS",        f"{n_alert:,}", "alert",
                 delta=f"{n_alert/total*100:.1f}% do total" if total else ""),
@@ -233,11 +232,7 @@ def _issues():
         textfont=dict(size=10, color="#e6edf3"),
     ))
     fig_h.update_layout(
-        **L, height=max(240, len(freq)*30), xaxis_title="Ocorrências",
-        yaxis=dict(autorange="reversed", showgrid=False,
-                   tickfont=dict(color="#e6edf3", size=11),
-                   linecolor="#21262d"),
-    )
+        **layout(max(240, len(freq)*30), xtitle="Ocorrências", horizontal=True))
 
     rows = [
         html.Tr([
@@ -248,7 +243,7 @@ def _issues():
             html.Td(r["VALOR_ATUAL"],
                     style={"fontFamily":"DM Mono,monospace","fontSize":"11px"}),
             html.Td(badge(r["SEVERIDADE"],
-                          "crit" if r["SEVERIDADE"]=="CRITICO" else "alert")),
+                    "crit" if r["SEVERIDADE"]=="CRITICO" else "alert")),
             html.Td(r["CODIGO"],
                     style={"fontFamily":"DM Mono,monospace","fontSize":"11px"}),
             html.Td(r["DESCRICAO"], className="wrap",
@@ -282,7 +277,8 @@ def _issues():
                  html.Table([
                      html.Thead(html.Tr([
                          html.Th(t) for t in
-                         ["ID","Grupo","Campo","Valor","Severidade","Código","Descrição"]
+                         ["ID","Grupo","Campo","Valor",
+                          "Severidade","Código","Descrição"]
                      ])),
                      html.Tbody(rows),
                  ]),
@@ -308,23 +304,23 @@ def _ativos():
         x=faixa["FAIXA"].astype(str), y=faixa["n"],
         marker_color="#388bfd", marker_opacity=0.85,
     ))
-    fig_age.update_layout(**L, height=230,
-                           yaxis_title="Participantes", xaxis_title="Faixa etária")
+    fig_age.update_layout(**layout(230, xtitle="Faixa etária",
+                                    ytitle="Participantes"))
 
     fig_sal = go.Figure(go.Histogram(
-        x=df_v["SALARIO_CONTRIB"].clip(upper=df_v["SALARIO_CONTRIB"].quantile(0.97)),
+        x=df_v["SALARIO_CONTRIB"].clip(
+            upper=df_v["SALARIO_CONTRIB"].quantile(0.97)),
         nbinsx=30, marker_color="#3fb950", marker_opacity=0.85,
     ))
-    fig_sal.update_layout(**L, height=230,
-                           yaxis_title="Participantes", xaxis_title="Salário (R$)")
+    fig_sal.update_layout(**layout(230, xtitle="Salário (R$)",
+                                    ytitle="Participantes"))
 
     df_sc = df_v[df_v["AG"].notna()]
     fig_sc = go.Figure(go.Scatter(
         x=df_sc["AG"], y=df_sc["SALARIO_CONTRIB"],
         mode="markers", marker=dict(color="#388bfd", opacity=0.4, size=5),
     ))
-    fig_sc.update_layout(**L, height=260,
-                          xaxis_title="Idade", yaxis_title="Salário (R$)")
+    fig_sc.update_layout(**layout(260, xtitle="Idade", ytitle="Salário (R$)"))
 
     cargo = (df.groupby("CARGO").size()
                .reset_index(name="n").sort_values("n", ascending=True))
@@ -333,10 +329,7 @@ def _ativos():
         marker_color="#388bfd", marker_opacity=0.8,
     ))
     fig_cargo.update_layout(
-        **L, height=260, xaxis_title="Participantes",
-        yaxis=dict(autorange="reversed", showgrid=False,
-                   tickfont=dict(color="#e6edf3", size=10), linecolor="#21262d"),
-    )
+        **layout(260, xtitle="Participantes", horizontal=True))
 
     return html.Div([
         html.Div([
@@ -345,10 +338,11 @@ def _ativos():
                      className="page-sub"),
         ], className="page-header"),
         html.Div([
-            kpi("Total",         f"{len(df):,}",                    "blue"),
-            kpi("Média Idade",   f"{df['AG'].mean():.1f} anos"),
-            kpi("Salário Médio", brl(df_v["SALARIO_CONTRIB"].mean())),
-            kpi("Massa Salarial",brl(df_v["SALARIO_CONTRIB"].sum()), delta="por mês"),
+            kpi("Total",          f"{len(df):,}",                     "blue"),
+            kpi("Média Idade",    f"{df['AG'].mean():.1f} anos"),
+            kpi("Salário Médio",  brl(df_v["SALARIO_CONTRIB"].mean())),
+            kpi("Massa Salarial", brl(df_v["SALARIO_CONTRIB"].sum()),
+                delta="por mês"),
         ], className="kpi-grid"),
         html.Div([
             card("Distribuição Etária",
@@ -358,7 +352,7 @@ def _ativos():
         ], className="chart-grid"),
         html.Div([
             card("Idade × Salário",
-                 "Relação entre idade e salário de contribuição", G(fig_sc)),
+                 "Relação entre idade e salário", G(fig_sc)),
             card("Distribuição por Cargo",
                  "Número de participantes por cargo", G(fig_cargo)),
         ], className="chart-grid"),
@@ -369,9 +363,9 @@ def _ativos():
 # PAGE 4 — Assistidos
 # ══════════════════════════════════════════════════════════════════════════════
 def _assistidos():
-    df     = DF_S.copy()
-    df["AG"] = ages(df).round(1)
-    df_v   = df[df["BENEFICIO_MENSAL"].notna() & (df["BENEFICIO_MENSAL"]>0)]
+    df      = DF_S.copy()
+    df["AG"]= ages(df).round(1)
+    df_v    = df[df["BENEFICIO_MENSAL"].notna() & (df["BENEFICIO_MENSAL"]>0)]
 
     bins   = list(range(55, 100, 5))
     labels = [f"{b}–{b+4}" for b in bins[:-1]]
@@ -382,32 +376,33 @@ def _assistidos():
         x=faixa["FAIXA"].astype(str), y=faixa["n"],
         marker_color="#3fb950", marker_opacity=0.85,
     ))
-    fig_age.update_layout(**L, height=230,
-                           yaxis_title="Assistidos", xaxis_title="Faixa etária")
+    fig_age.update_layout(**layout(230, xtitle="Faixa etária",
+                                    ytitle="Assistidos"))
 
     fig_ben = go.Figure(go.Histogram(
         x=df_v["BENEFICIO_MENSAL"].clip(
             upper=df_v["BENEFICIO_MENSAL"].quantile(0.97)),
         nbinsx=25, marker_color="#d29922", marker_opacity=0.85,
     ))
-    fig_ben.update_layout(**L, height=230,
-                           yaxis_title="Assistidos", xaxis_title="Benefício (R$)")
+    fig_ben.update_layout(**layout(230, xtitle="Benefício (R$)",
+                                    ytitle="Assistidos"))
 
     tipo = df.groupby("TIPO_BENEFICIO").size().reset_index(name="n")
     fig_tipo = go.Figure(go.Pie(
         labels=tipo["TIPO_BENEFICIO"], values=tipo["n"], hole=0.55,
         marker=dict(colors=["#3fb950","#388bfd","#d29922","#f85149"]),
-        textinfo="label+percent", textfont=dict(size=11, color="#e6edf3"),
+        textinfo="label+percent",
+        textfont=dict(size=11, color="#e6edf3"),
     ))
-    fig_tipo.update_layout(**L, height=260, showlegend=False)
+    fig_tipo.update_layout(**BASE, height=260, showlegend=False)
 
     df_sc = df_v[df_v["AG"].notna()]
     fig_sc = go.Figure(go.Scatter(
         x=df_sc["AG"], y=df_sc["BENEFICIO_MENSAL"],
         mode="markers", marker=dict(color="#3fb950", opacity=0.5, size=5),
     ))
-    fig_sc.update_layout(**L, height=260,
-                          xaxis_title="Idade", yaxis_title="Benefício (R$)")
+    fig_sc.update_layout(**layout(260, xtitle="Idade",
+                                   ytitle="Benefício (R$)"))
 
     ratio_cls = "alert" if SUMM["razao_assistidos_ativos"] > 0.40 else "ok"
 
