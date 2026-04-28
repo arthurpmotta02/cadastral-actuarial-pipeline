@@ -2,15 +2,19 @@
 
 Pipeline Python que valida e prepara dados cadastrais de participantes de fundos de pensão (EFPC) antes da avaliação atuarial anual, conforme exigências regulatórias da PREVIC.
 
+> **Nota:** o `localhost:8050` mencionado abaixo é local — só você consegue acessar
+> na sua máquina. Para outros acessarem é necessário rodar o Docker num servidor
+> acessível na rede, ou usar deploy em nuvem.
+
 ---
 
 ## Por que esse projeto existe
 
-A Resolução PREVIC nº 7/2022 (Art. 8) exige que toda EFPC archive seus dados cadastrais em planilha eletrônica antes de cada avaliação atuarial. O CPA 017/2019 do IBA (Instituto Brasileiro de Atuária) define que **a crítica da base cadastral é o primeiro passo obrigatório de toda auditoria atuarial**:
+A Resolução PREVIC nº 7/2022 (Art. 8) exige que toda EFPC archive seus dados cadastrais em planilha eletrônica antes de cada avaliação atuarial. O CPA 017/2019 do IBA define que **a crítica da base cadastral é o primeiro passo obrigatório de toda auditoria atuarial**:
 
-> "O Atuário Independente deve verificar se as informações sobre os participantes e assistidos do plano de benefícios estão alinhadas com os registros internos."
+> "O Atuário Independente deve verificar se as informações sobre os participantes e assistidos estão alinhadas com os registros internos e os dados utilizados pelo Atuário Responsável Técnico."
 
-Na prática esse processo é feito manualmente em Excel. Este pipeline automatiza as verificações em ~2 segundos, gera o relatório atuarial formatado, exporta os dados para Power BI e disponibiliza um dashboard interativo via Docker.
+Na prática esse processo é feito manualmente em Excel. Este pipeline automatiza as verificações em ~2 segundos, gera o relatório atuarial formatado, exporta dados para Power BI e disponibiliza um dashboard interativo.
 
 ---
 
@@ -18,9 +22,9 @@ Na prática esse processo é feito manualmente em Excel. Este pipeline automatiz
 
 | Camada | Tecnologia | Uso |
 |---|---|---|
-| Validação + relatório | Python, pandas, openpyxl | Pipeline CLI |
-| Dashboard interativo | Plotly Dash, Flask/gunicorn | 4 páginas dark theme |
-| Deploy empresarial | Docker, docker-compose | Self-hosted, dados na rede interna |
+| Validação + relatório | Python · pandas · openpyxl | Pipeline CLI |
+| Dashboard interativo | Plotly Dash 4 · Flask · gunicorn | 4 páginas dark theme |
+| Deploy empresarial | Docker · docker-compose | Self-hosted, dados na rede interna |
 | BI corporativo | Power BI Desktop | `powerbi_data.xlsx` pronto para importar |
 
 ---
@@ -30,26 +34,25 @@ Na prática esse processo é feito manualmente em Excel. Este pipeline automatiz
 ### Opção A — Python direto
 
 ```bash
-# Setup
 python -m venv venv
 venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 
-# Rodar pipeline (gera os Excels)
+# Rodar pipeline — gera os Excels em results/reports/
 python src/pipeline.py --demo
 
-# Rodar dashboard
-python app/dashboard.py      # http://localhost:8050
+# Rodar dashboard — abre em http://localhost:8050
+python app/dashboard.py
 ```
 
-### Opção B — Docker (recomendado para uso empresarial)
+### Opção B — Docker (deploy empresarial)
 
 ```bash
-# Build e start
+# Build e start (requer Docker Desktop instalado e rodando)
 docker compose up -d
 
-# Acessar
-# http://localhost:8050
+# Acessar em http://localhost:8050
+# Na rede interna da empresa: http://IP-DO-SERVIDOR:8050
 
 # Ver logs
 docker compose logs -f
@@ -58,40 +61,39 @@ docker compose logs -f
 docker compose down
 ```
 
-> **Vantagem empresarial:** dados de participantes nunca saem da rede interna.
-> Adequado para EFPCs com restrições LGPD e políticas de segurança da informação.
+> **Por que Docker para uso empresarial?**
+> Dados de participantes de EFPC são protegidos pela LGPD. Com Docker self-hosted,
+> nenhum dado sai da rede interna — o container roda no servidor da própria empresa.
 
 ---
 
 ## Saídas geradas
 
-```
-python src/pipeline.py --demo
-```
-
 | Arquivo | Destinatário | Conteúdo |
 |---|---|---|
-| `results/reports/relatorio_critica_cadastral.xlsx` | Atuário responsável | 4 abas: sumário executivo, inconsistências detalhadas, base limpa, análise por tipo |
-| `results/reports/powerbi_data.xlsx` | Analista de BI | 6 tabelas flat: população, inconsistências, KPIs — prontas para Power BI Desktop |
+| `results/reports/relatorio_critica_cadastral.xlsx` | Atuário responsável | 4 abas: sumário executivo, inconsistências, base limpa, análise por tipo |
+| `results/reports/powerbi_data.xlsx` | Analista de BI | 6 tabelas flat prontas para Power BI Desktop |
 
 ---
 
-## Dashboard (Plotly Dash)
+## Dashboard (Plotly Dash 4)
 
-4 páginas no sidebar:
+4 páginas navegáveis pelo sidebar:
 
-- **Visão Geral** — KPIs de população, gráfico de inconsistências por código, donut de composição
-- **Inconsistências** — frequência por código + tabela completa com badges CRÍTICO/ALERTA
-- **Ativos** — distribuição etária, salarial, scatter idade×salário, breakdown por cargo
-- **Assistidos** — distribuição etária, de benefícios, por tipo, scatter idade×benefício
+| Página | Conteúdo |
+|---|---|
+| **Visão Geral** | KPIs de população, gráfico de inconsistências por código, donut de composição |
+| **Inconsistências** | Frequência por código + tabela completa com badges CRÍTICO/ALERTA |
+| **Ativos** | Distribuição etária, salarial, scatter idade×salário, breakdown por cargo |
+| **Assistidos** | Distribuição etária, de benefícios, por tipo, scatter idade×benefício |
 
 ---
 
 ## Power BI
 
-Ver `powerbi/INSTRUCOES_POWER_BI.md` para:
-- Conectar o `powerbi_data.xlsx` no Power BI Desktop
-- Criar relacionamentos entre tabelas
+Ver `powerbi/INSTRUCOES_POWER_BI.md` para passo a passo completo com:
+- Conectar `powerbi_data.xlsx` no Power BI Desktop
+- Criar relacionamentos entre as 6 tabelas
 - Medidas DAX prontas (N Críticos, Razão Assistidos/Ativos, etc.)
 - 4 páginas de dashboard sugeridas
 
@@ -106,19 +108,19 @@ Ver `powerbi/INSTRUCOES_POWER_BI.md` para:
 | C003 | CRÍTICO | Ativo com menos de 16 anos | CLT Art. 403 |
 | C004 | CRÍTICO | Admissão ao plano após data-base | Não deveria constar na avaliação |
 | C005 | CRÍTICO | Admissão anterior ao nascimento | Tempo de serviço e PMBaC incorretos |
-| C006 | CRÍTICO | Salário abaixo do SMN 2024 (R$ 1.412) | No PUC, propaga para o benefício projetado inteiro |
+| C006 | CRÍTICO | Salário abaixo do SMN 2024 (R$ 1.412) | No método PUC, propaga para todo o benefício projetado |
 | C007 | CRÍTICO | Código de sexo inválido | Tábua biométrica errada — ä₆₅ muda ±16% |
 | C008 | CRÍTICO | Situação não reconhecida pela PREVIC | Grupo de custeio incorreto |
-| C009 | CRÍTICO | CPF duplicado | PMBaC calculada em duplicidade |
+| C009 | CRÍTICO | CPF duplicado | PMBaC calculada em duplicidade — passivo inflado |
 | C010 | CRÍTICO | Campo obrigatório ausente em assistido | Impede cálculo da PMBC |
 | C011 | CRÍTICO | Benefício nulo ou negativo | PMBC = 0 → passivo subestimado, risco de falso superávit |
 | C012 | CRÍTICO | Saldo de conta nulo em diferido | Reserva de BPD incorreta |
 | A001 | ALERTA | Ativo com mais de 75 anos | Confirmar permanência em atividade |
-| A002 | ALERTA | Admissão quando participante tinha < 16 anos | Verificar com RH |
+| A002 | ALERTA | Admissão quando tinha < 16 anos | Verificar com RH |
 | A003 | ALERTA | Salário acima de R$ 100.000 | Confirmar com RH |
 | A004 | ALERTA | Benefício abaixo do SMN | Verificar se correto |
 | A005 | ALERTA | Benefício acima de R$ 80.000 | Confirmar com cadastro |
-| A006 | ALERTA | Aposentadoria programada antes dos 55 anos | Pode ser invalidez com tipo errado |
+| A006 | ALERTA | Aposentadoria programada antes dos 55 anos | Pode ser invalidez lançada com tipo errado |
 | A007 | ALERTA | Diferido acima de 70 anos sem benefício | Verificar se está vivo e foi notificado |
 
 ---
@@ -141,9 +143,9 @@ Ver `powerbi/INSTRUCOES_POWER_BI.md` para:
 ```
 cadastral-actuarial-pipeline/
 │
-├── Dockerfile                    ← build da imagem Docker
-├── docker-compose.yml            ← orquestração (1 comando para subir)
-├── requirements.txt              ← dependências Python
+├── Dockerfile                    ← imagem Docker para deploy empresarial
+├── docker-compose.yml            ← sobe tudo com 1 comando
+├── requirements.txt
 ├── README.md
 │
 ├── src/
@@ -153,24 +155,24 @@ cadastral-actuarial-pipeline/
 │   └── report_generator.py      ← Excel atuarial + Power BI flat tables
 │
 ├── app/
-│   ├── dashboard.py              ← Plotly Dash (4 páginas, dark theme)
-│   └── assets/style.css         ← CSS customizado
+│   ├── dashboard.py              ← Plotly Dash 4 (4 páginas, dark theme)
+│   └── assets/style.css
 │
 ├── powerbi/
-│   └── INSTRUCOES_POWER_BI.md   ← guia completo com DAX e páginas sugeridas
+│   └── INSTRUCOES_POWER_BI.md
 │
 └── data/
     ├── raw/                      ← base recebida do RH (.xlsx)
-    └── processed/                ← base limpa exportada pelo pipeline
+    └── processed/
 ```
 
 ---
 
 ## Referências regulatórias
 
-- **Resolução PREVIC nº 7/2022, Art. 8** — dados cadastrais devem ser arquivados em planilha eletrônica
-- **Resolução PREVIC nº 23/2023** — norma consolidada EFPC (classificação ATIVO/ASSISTIDO/DIFERIDO)
-- **CPA 017/2019 IBA** — Auditoria Atuarial e de Benefícios: crítica cadastral é o primeiro passo
+- **Resolução PREVIC nº 7/2022, Art. 8** — dados cadastrais em planilha eletrônica
+- **Resolução PREVIC nº 23/2023** — norma consolidada EFPC
+- **CPA 017/2019 IBA** — Auditoria Atuarial: crítica cadastral é o primeiro passo
 - **CPAO 035 IBA** — Reservas Matemáticas (PMBaC, PMBC, método PUC)
 - **CLT Art. 403** — idade mínima de trabalho (16 anos)
 
