@@ -1,0 +1,31 @@
+table POP_ATIVOS
+    annotation PBI_ResultType = Table
+
+    partition POP_ATIVOS-partition = m
+        mode: import
+        source =
+            let
+                    src = Excel.Workbook(File.Contents("C:/Users/Arthur/Documents/VS Code/Projetos/cadastral-actuarial-pipeline/results/reports/powerbi_data.xlsx"), null, true),
+                    sheet = src{[Item="POP_ATIVOS",Kind="Sheet"]}[Data],
+                    promoted = Table.PromoteHeaders(sheet, [PromoteAllScalars=true])
+            in
+                    promoted
+
+    column ID_PARTICIPANTE
+        dataType: string
+    column SEXO
+        dataType: string
+    column SITUACAO
+        dataType: string
+    column CARGO
+        dataType: string
+    column SALARIO_CONTRIB
+        dataType: double
+    column IDADE
+        dataType: double
+    column FAIXA_ETARIA
+        dataType: string
+    column TEMPO_PLANO_ANOS
+        dataType: double
+    column SITUACAO_GRUPO
+        dataType: string

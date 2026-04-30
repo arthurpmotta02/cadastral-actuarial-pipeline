@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "CriticaCadastral"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "e44a7c77-6a55-4176-8e48-da30b52f5988"
+  }
+}

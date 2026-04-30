@@ -1,53 +1,76 @@
 # Crítica da Base Cadastral — Avaliação Atuarial EFPC
 
-Pipeline Python que valida e prepara dados cadastrais de participantes de fundos de pensão (EFPC) antes da avaliação atuarial anual, conforme exigências regulatórias da PREVIC.
+Pipeline Python de validação e crítica de bases cadastrais de fundos de pensão (EFPC), conforme exigências da PREVIC e do Instituto Brasileiro de Atuária. O sistema automatiza em aproximadamente dois segundos um processo que tipicamente ocupa horas de trabalho manual em Excel, gerando relatório atuarial formatado, dados para Power BI e um dashboard interativo via Plotly Dash ou Power BI Desktop.
 
-> **Nota:** o `localhost:8050` mencionado abaixo é local — só você consegue acessar
-> na sua máquina. Para outros acessarem é necessário rodar o Docker num servidor
-> acessível na rede, ou usar deploy em nuvem.
+![Visão Geral](docs/visao_geral.png)
 
 ---
 
-## Por que esse projeto existe
+## Por que este projeto existe
 
-A Resolução PREVIC nº 7/2022 (Art. 8) exige que toda EFPC archive seus dados cadastrais em planilha eletrônica antes de cada avaliação atuarial. O CPA 017/2019 do IBA define que **a crítica da base cadastral é o primeiro passo obrigatório de toda auditoria atuarial**:
+A **Resolução PREVIC nº 7/2022, Art. 8** determina que toda EFPC mantenha seus dados cadastrais em planilha eletrônica antes de cada avaliação atuarial anual. O **CPA 017/2019 do IBA** define que a crítica da base cadastral é o primeiro passo obrigatório de toda auditoria atuarial:
 
 > "O Atuário Independente deve verificar se as informações sobre os participantes e assistidos estão alinhadas com os registros internos e os dados utilizados pelo Atuário Responsável Técnico."
 
-Na prática esse processo é feito manualmente em Excel. Este pipeline automatiza as verificações em ~2 segundos, gera o relatório atuarial formatado, exporta dados para Power BI e disponibiliza um dashboard interativo.
+Na prática esse processo é feito manualmente, campo a campo, em planilhas Excel. O atuário verifica datas de nascimento inválidas, salários abaixo do SMN, CPFs duplicados, admissões posteriores à data-base e dezenas de outros critérios — muitos deles definidos na tábua biométrica AT-2000 ou BR-EMS 2021, cuja escolha depende do sexo do participante.
 
----
-
-## Stack
-
-| Camada | Tecnologia | Uso |
-|---|---|---|
-| Validação + relatório | Python · pandas · openpyxl | Pipeline CLI |
-| Dashboard interativo | Plotly Dash 4 · Flask · gunicorn | 4 páginas dark theme |
-| Deploy empresarial | Docker · docker-compose | Self-hosted, dados na rede interna |
-| BI corporativo | Power BI Desktop | `powerbi_data.xlsx` pronto para importar |
-
----
-
-## Screenshots
-
-**Visão Geral** — KPIs de população, inconsistências por código e composição da base
-![Visão Geral](docs/visao_geral.png)
-
-**Inconsistências** — frequência por código e tabela completa com badges CRÍTICO/ALERTA
-![Inconsistências](docs/inconsistencias.png)
-
-**Ativos** — distribuição etária, salarial, scatter idade × salário e breakdown por cargo
-![Ativos](docs/ativos.png)
-
-**Assistidos** — distribuição etária, de benefícios, por tipo e scatter idade × benefício
-![Assistidos](docs/assistidos.png)
+Este pipeline automatiza as 19 verificações regulatórias em uma passagem única sobre os dados, classifica cada problema como CRÍTICO (impede o cálculo das provisões matemáticas) ou ALERTA (exige análise mas não bloqueia), e entrega os resultados em múltiplos formatos para diferentes perfis de usuário na EFPC.
 
 ---
 
 ## Arquitetura do pipeline
 
 ![Pipeline](docs/pipeline_diagram.png)
+
+O fluxo começa em qualquer planilha do RH e termina em relatórios atuariais, dashboards e um projeto Power BI completamente funcional, tudo gerado por código, sem interação humana.
+
+```
+Base cadastral do RH (Excel)
+        │
+        ▼
+   pipeline.py          ← entrada via CLI ou função Python
+        │
+   validator.py         ← 19 verificações regulatórias
+        │
+        ▼
+   report_generator.py  ← monta os 7 arquivos de saída
+        │
+   ┌────┴────────────────────────────┐
+   ▼                                 ▼
+relatorio_critica_cadastral.xlsx    powerbi_data.xlsx (7 abas)
+(relatório atuarial, 4 abas)              │
+                                          ▼
+                                   powerbi_generator.py
+                                          │
+                                   ┌──────┴──────┐
+                                   ▼              ▼
+                            PBIP/PBIR project  dashboard.py
+                            (Power BI Desktop)  (Plotly Dash 4)
+```
+
+---
+
+## Stack tecnológico
+
+| Camada | Tecnologia | Uso |
+|---|---|---|
+| Validação e relatório | Python 3.11 · pandas · openpyxl | Pipeline CLI, 19 verificações, Excels formatados |
+| Dashboard interativo | Plotly Dash 4 · Flask · gunicorn | 4 páginas, tema dark, roteamento via dcc.Location |
+| Deploy empresarial | Docker · docker-compose | Self-hosted, dados permanecem na rede interna |
+| BI corporativo gerado por código | Power BI PBIP/PBIR · TMDL | src/powerbi_generator.py gera 47 arquivos JSON |
+
+---
+
+## Screenshots
+
+**Inconsistências Identificadas** — frequência por código regulatório e tabela completa com badges CRÍTICO e ALERTA
+![Inconsistências](docs/inconsistencias.png)
+
+**Participantes Ativos** — distribuição etária, salarial, scatter idade × salário e breakdown por cargo
+![Ativos](docs/ativos.png)
+
+**Assistidos (Beneficiários)** — distribuição etária, benefícios por faixa, donut por tipo e scatter idade × benefício mensal
+![Assistidos](docs/assistidos.png)
 
 ---
 
@@ -58,20 +81,23 @@ Na prática esse processo é feito manualmente em Excel. Este pipeline automatiz
 ```bash
 python -m venv venv
 venv\Scripts\activate        # Windows
+# ou
+source venv/bin/activate     # Linux/Mac
+
 pip install -r requirements.txt
 
-# Rodar pipeline — gera os Excels em results/reports/
+# Rodar pipeline com dados demo (930 participantes sintéticos)
 python src/pipeline.py --demo
 
-# Rodar dashboard — abre em http://localhost:8050
+# Abrir dashboard em http://localhost:8050
 python app/dashboard.py
 ```
 
 ### Opção B — Docker (deploy empresarial)
 
 ```bash
-# Build e start (requer Docker Desktop instalado e rodando)
-docker compose up -d
+# Build e start
+docker compose up -d --build
 
 # Acessar em http://localhost:8050
 # Na rede interna da empresa: http://IP-DO-SERVIDOR:8050
@@ -83,143 +109,202 @@ docker compose logs -f
 docker compose down
 ```
 
-> **Por que Docker para uso empresarial?**
-> Dados de participantes de EFPC são protegidos pela LGPD. Com Docker self-hosted,
-> nenhum dado sai da rede interna — o container roda no servidor da própria empresa.
+### Opção C — Power BI gerado por código
+
+```bash
+# 1. Gerar os dados
+python src/pipeline.py --demo
+
+# 2. Gerar o projeto PBIP/PBIR completo (47 arquivos JSON)
+python src/powerbi_generator.py
+
+# 3. Habilitar PBIR no Power BI Desktop
+#    File > Options > Preview features >
+#    "Store reports using enhanced metadata format (PBIR)"
+
+# 4. Abrir o projeto
+#    File > Open > powerbi/report/CriticaCadastral.pbip
+```
 
 ---
 
 ## Saídas geradas
 
-| Arquivo | Destinatário | Conteúdo |
-|---|---|---|
-| `results/reports/relatorio_critica_cadastral.xlsx` | Atuário responsável | 4 abas: sumário executivo, inconsistências, base limpa, análise por tipo |
-| `results/reports/powerbi_data.xlsx` | Analista de BI | 6 tabelas flat prontas para Power BI Desktop |
+Após `python src/pipeline.py --demo` a pasta `results/reports/` conterá:
+
+**`relatorio_critica_cadastral.xlsx`** — relatório para o atuário responsável, com quatro abas:
+
+- `Sumário` — KPIs gerais, data-base, razão assistidos/ativos, massa salarial total
+- `CRITICAS` — registros que impedem o cálculo de PMBaC/PMBC, com descrição regulatória completa
+- `ALERTAS` — registros que exigem análise antes da avaliação
+- `Populacao_OK` — participantes sem inconsistências, prontos para o modelo atuarial
+
+**`powerbi_data.xlsx`** — 7 abas estruturadas para importação no Power BI:
+
+- `POP_ATIVOS`, `POP_ASSISTIDOS`, `POP_DIFERIDOS` — dados populacionais enriquecidos com faixas etárias
+- `POPULACAO_TOTAL` — visão consolidada dos três grupos para gráficos de composição
+- `INCONSISTENCIAS` — todas as inconsistências com campos, valores, severidade e descrição regulatória
+- `FREQ_INCONSISTENCIAS` — frequência por código, com percentual do total
+- `SUMARIO_KPI` — linha única com todos os indicadores em formato wide para cards no Power BI
 
 ---
 
-## Dashboard (Plotly Dash 4)
+## Dashboard Plotly Dash
 
-4 páginas navegáveis pelo sidebar:
+O dashboard roda em `http://localhost:8050` e tem quatro páginas navegáveis via sidebar:
 
-| Página | Conteúdo |
-|---|---|
-| **Visão Geral** | KPIs de população, gráfico de inconsistências por código, donut de composição |
-| **Inconsistências** | Frequência por código + tabela completa com badges CRÍTICO/ALERTA |
-| **Ativos** | Distribuição etária, salarial, scatter idade×salário, breakdown por cargo |
-| **Assistidos** | Distribuição etária, de benefícios, por tipo, scatter idade×benefício |
+**Visão Geral** exibe os seis KPIs principais (total de participantes por situação regulamentar, inconsistências críticas e alertas), o gráfico de inconsistências por código com cores CRÍTICO/ALERTA e o donut de composição da população.
 
----
+**Inconsistências Identificadas** mostra o gráfico de frequência por código, o banner com o total de críticas (em vermelho conforme CPA 017/2019) e a tabela completa dos registros problemáticos com IDs, campos, valores e descrições regulatórias, incluindo o artigo da norma infringida.
 
-## Power BI
+**Participantes Ativos** traz a distribuição etária por faixa (com visibilidade de participantes sem DT_NASCIMENTO — estes são as próprias inconsistências C001, mantidos intencionalmente no gráfico), a distribuição salarial, o scatter idade × salário e o ranking de cargos.
 
-Ver `powerbi/INSTRUCOES_POWER_BI.md` para passo a passo completo com:
-- Conectar `powerbi_data.xlsx` no Power BI Desktop
-- Criar relacionamentos entre as 6 tabelas
-- Medidas DAX prontas (N Críticos, Razão Assistidos/Ativos, etc.)
-- 4 páginas de dashboard sugeridas
+**Assistidos (Beneficiários)** exibe a distribuição etária, o benefício médio por faixa etária, o donut por tipo de benefício (aposentadoria programada, invalidez, pensão) e o scatter idade × benefício mensal.
 
 ---
 
-## Por que Power BI point-and-click não é estado da arte
+## Power BI — gerado completamente por código
 
-Este projeto exporta um `powerbi_data.xlsx` pronto para importação manual no Power BI Desktop. Vale ser honesto sobre o que isso significa tecnicamente: é uma concessão à realidade do mercado corporativo brasileiro atual, não uma escolha de engenharia ideal. A seção abaixo documenta por que ferramentas de BI puramente visuais têm limitações estruturais sérias, o que o ecossistema está fazendo para resolvê-las, e o caminho que este projeto seguirá quando as ferramentas amadurecerem.
+### Como funciona o gerador PBIP/PBIR
 
-### O problema do arquivo binário e da memória humana
-
-Qualquer ferramenta de BI que exige que um humano arraste visuais, configure relacionamentos manualmente e salve um arquivo binário viola um princípio básico da engenharia de software: **reprodutibilidade**. Se o processo de criação de um artefato não pode ser descrito integralmente em código, ele não pode ser versionado, testado, revisado em pull request, auditado, ou reproduzido de forma idêntica por outra pessoa em outra máquina. O conhecimento existe na memória de quem clicou, não no repositório.
-
-No contexto de uma EFPC isso tem consequências concretas.
-
-**Versionamento inexistente.** Um arquivo `.pbix` é um ZIP binário. Executar `git diff` num `.pbix` não produz nenhuma informação útil — o Git trata o arquivo como um blob opaco. Não existe registro legível de quais medidas DAX foram alteradas entre a avaliação atuarial de dezembro e a de março, qual visual foi adicionado e por quê, ou quem mudou qual filtro. Em auditoria atuarial, onde rastreabilidade é um requisito regulatório explícito da Resolução PREVIC 7/2022, isso é uma falha estrutural.
-
-**Irreprodutibildade sistêmica.** Se o analista que montou o relatório sair da empresa, a capacidade de reproduzir aquele dashboard vai junto. Não existe um script que descreva "execute esses comandos e você terá o mesmo resultado". Em contraste, este pipeline pode ser executado com `python src/pipeline.py --demo` por qualquer pessoa em qualquer máquina e produzirá outputs idênticos — essa é a definição de reprodutibilidade.
-
-**Integração contínua impossível.** Ferramentas de BI visuais não se integram a pipelines de CI/CD. Não existe um comando `powerbi build --validate` que roda no GitHub Actions para garantir que o relatório está consistente com os dados antes de cada deploy. Toda mudança nos dados, seja um novo campo no cadastro ou uma nova situação regulatória adicionada pela PREVIC, exige intervenção manual no relatório.
-
-**Colaboração travada.** Dois analistas não conseguem trabalhar simultaneamente no mesmo `.pbix` sem sobrescrever o trabalho um do outro. A solução usual nas empresas ("fulano trabalha enquanto cicrano não mexe") é o equivalente a desenvolver software sem controle de versão. Qualquer equipe de engenharia de software rejeitaria esse fluxo imediatamente.
-
-**Acoplamento a licença e sistema operacional.** O `.pbix` só abre no Power BI Desktop, que só roda em Windows, que exige conta Microsoft ativa. O Dash deste projeto roda em qualquer sistema operacional, em qualquer browser, sem licença, com `python app/dashboard.py`.
-
-### O que o mercado está construindo para resolver isso
-
-A Microsoft reconheceu esses problemas. O estado da arte em 2026 envolve três tecnologias que juntas movem o Power BI de ferramenta visual para infraestrutura de código.
-
-**PBIR (Power BI Enhanced Report Format)** decompõe o arquivo monolítico `.pbix` em uma estrutura de pastas com arquivos JSON individuais para cada página, visual, bookmark e interação. Cada arquivo tem um schema JSON público documentado pela Microsoft. Tornou-se o formato padrão do Power BI Service em janeiro de 2026 e do Power BI Desktop em março de 2026. Pela primeira vez é possível fazer `git diff` num relatório Power BI e ver exatamente qual propriedade de qual visual mudou. Fonte: [Microsoft Learn, Power BI Enhanced Report Format](https://learn.microsoft.com/en-us/power-bi/developer/embedded/projects-enhanced-report-format).
-
-**PBIP (Power BI Project)** organiza o PBIR e o TMDL (modelo semântico como texto) em uma estrutura de diretórios versionável com Git. Um relatório Power BI passa a ser um repositório como qualquer outro projeto de software, com histórico de commits, branches e pull requests. Fonte: [Microsoft Learn, Power BI Desktop Projects](https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-overview).
-
-**`powerbpy`** é uma biblioteca Python open-source que gera a estrutura PBIP/PBIR inteiramente por código, sem abrir o Power BI Desktop. O resultado pode ser aberto e editado normalmente no Desktop, e versionado no Git como qualquer arquivo de texto. Fonte: [powerbpy no PyPI](https://pypi.org/project/powerbpy/).
-
-### Por que este projeto ainda não usa essas ferramentas
-
-O PBIR ainda está em preview. A Microsoft adverte que a especificação pode mudar antes do GA previsto para Q3 2026, e o `powerbpy` é um projeto de desenvolvedor independente cujo roadmap depende da estabilidade do PBIR. Construir um pipeline de produção sobre especificação em preview seria trocar um problema (relatório não reprodutível) por outro (código que quebra quando a Microsoft muda a spec antes do GA).
-
-Exportar `powerbi_data.xlsx` bem estruturado para importação manual é a decisão pragmaticamente correta para o momento: satisfaz o requisito real dos analistas de EFPC que precisam de Power BI hoje, sem amarrar o projeto a tecnologia instável.
-
-### O que este projeto fará quando o PBIR atingir GA
-
-Assim que o PBIR sair de preview (previsão Q3 2026), o projeto será atualizado com um gerador programático:
+O arquivo `src/powerbi_generator.py` cria um projeto Power BI completo a partir do `powerbi_data.xlsx` sem abrir o Power BI Desktop. O resultado são 47 arquivos organizados na estrutura oficial da Microsoft:
 
 ```
-src/
-└── powerbi_generator.py   -- gera estrutura PBIP/PBIR por Python
-                              sem abrir o Power BI Desktop
-                              usando powerbpy + edição direta dos JSON PBIR
-
-powerbi/
-├── INSTRUCOES_POWER_BI.md  -- mantido para quem preferir o fluxo manual
-└── report/                 -- gerado automaticamente pelo script
+powerbi/report/
+├── CriticaCadastral.pbip
+├── CriticaCadastral.SemanticModel/
+│   ├── .platform                          ← identifica o item para o Fabric
+│   ├── definition.pbism
+│   ├── diagramLayout.json
+│   └── definition/
+│       ├── model.tmdl                     ← modelo semântico como texto (TMDL)
+│       ├── database.tmdl
+│       ├── cultures/pt-BR.tmdl
+│       └── tables/
+│           ├── POP_ATIVOS.tmdl
+│           ├── POP_ASSISTIDOS.tmdl
+│           ├── POP_DIFERIDOS.tmdl
+│           ├── POPULACAO_TOTAL.tmdl
+│           ├── INCONSISTENCIAS.tmdl
+│           ├── FREQ_INCONSISTENCIAS.tmdl
+│           └── SUMARIO_KPI.tmdl           ← TransformColumnTypes para tipos numéricos
+└── CriticaCadastral.Report/
+    ├── .platform                          ← identifica o item como Report
     ├── definition.pbir
-    ├── pages/
-    └── visuals/
+    ├── StaticResources/SharedResources/BaseThemes/CY24SU10.json
+    └── definition/
+        ├── version.json
+        ├── report.json
+        └── pages/
+            ├── pages.json
+            └── <uuid>/
+                ├── page.json
+                └── visuals/<uuid>/visual.json  ← um arquivo por visual
 ```
 
-O pipeline passará a ser completamente reprodutível de ponta a ponta:
+O modelo semântico é escrito em **TMDL** (Tabular Model Definition Language), o formato texto oficial da Microsoft para versionamento de semantic models. Cada tabela tem seu próprio `.tmdl` com a query M que lê o Excel — incluindo `Table.TransformColumnTypes` para garantir que colunas numéricas sejam reconhecidas como números pelo Power Query, independente do que o Excel inferir. Isso é necessário porque o Power BI Desktop não herda automaticamente os tipos de dados de um arquivo Excel quando as colunas são lidas via `Table.PromoteHeaders`.
 
-```bash
-python src/pipeline.py --demo       # valida dados, gera Excels
-python src/powerbi_generator.py     # gera relatório Power BI por código
-```
+Cada visual é um `visual.json` com estrutura baseada no schema `visualContainer/1.3.0` e no código-fonte do `powerbpy v0.2.0`. A agregação usada nos gráficos de contagem é `Function: 5` (CountNonNull), exibida como "Count of [campo]" no Desktop. O gráfico de frequência de inconsistências usa `Function: 0` (Sum) sobre `OCORRENCIAS`, declarada como `Int64.Type` no TMDL.
+
+Os arquivos `.platform` em cada pasta são obrigatórios a partir do Power BI Desktop April 2026 para identificar os itens como SemanticModel e Report dentro do ecossistema Fabric.
+
+### Por que isso importa
+
+Um arquivo `.pbix` é um ZIP binário opaco. Um `git diff` entre duas versões de um relatório `.pbix` é ilegível — o arquivo inteiro aparece como alterado. Isso torna revisão por pares, auditoria e rastreabilidade de mudanças praticamente impossíveis em contextos regulatórios onde rastreabilidade é um requisito, não uma conveniência.
+
+O PBIP/PBIR resolve isso ao transformar o relatório em texto. Um `git diff` entre duas avaliações atuariais mostra exatamente quais visuais foram adicionados, quais métricas mudaram, quais fórmulas DAX foram alteradas — linha a linha, auditável por qualquer revisor com acesso ao repositório. Para uma EFPC sob fiscalização da PREVIC, isso é um ganho real.
 
 ---
 
-## Validações implementadas (19 verificações)
+## Plotly Dash versus Power BI: uma análise honesta
 
-| Código | Severidade | Verificação | Impacto Atuarial |
-|---|---|---|---|
-| C001 | CRÍTICO | Campo obrigatório ausente | Impede cálculo de PMBaC/PMBC |
-| C002 | CRÍTICO | Data de nascimento no futuro | Impossível logicamente |
-| C003 | CRÍTICO | Ativo com menos de 16 anos | CLT Art. 403 |
-| C004 | CRÍTICO | Admissão ao plano após data-base | Não deveria constar na avaliação |
-| C005 | CRÍTICO | Admissão anterior ao nascimento | Tempo de serviço e PMBaC incorretos |
-| C006 | CRÍTICO | Salário abaixo do SMN 2024 (R$ 1.412) | No método PUC, propaga para todo o benefício projetado |
-| C007 | CRÍTICO | Código de sexo inválido | Tábua biométrica errada — ä₆₅ muda ±16% |
-| C008 | CRÍTICO | Situação não reconhecida pela PREVIC | Grupo de custeio incorreto |
-| C009 | CRÍTICO | CPF duplicado | PMBaC calculada em duplicidade — passivo inflado |
-| C010 | CRÍTICO | Campo obrigatório ausente em assistido | Impede cálculo da PMBC |
-| C011 | CRÍTICO | Benefício nulo ou negativo | PMBC = 0 → passivo subestimado, risco de falso superávit |
-| C012 | CRÍTICO | Saldo de conta nulo em diferido | Reserva de BPD incorreta |
-| A001 | ALERTA | Ativo com mais de 75 anos | Confirmar permanência em atividade |
-| A002 | ALERTA | Admissão quando tinha < 16 anos | Verificar com RH |
-| A003 | ALERTA | Salário acima de R$ 100.000 | Confirmar com RH |
-| A004 | ALERTA | Benefício abaixo do SMN | Verificar se correto |
-| A005 | ALERTA | Benefício acima de R$ 80.000 | Confirmar com cadastro |
-| A006 | ALERTA | Aposentadoria programada antes dos 55 anos | Pode ser invalidez lançada com tipo errado |
-| A007 | ALERTA | Diferido acima de 70 anos sem benefício | Verificar se está vivo e foi notificado |
+Esta é uma questão genuína e a resposta depende de quem vai usar o sistema e em que contexto.
+
+### Plotly Dash é preferível quando
+
+O destinatário principal é um profissional técnico — atuário, cientista de dados, analista quantitativo — que trabalha com Python e precisa de controle total sobre o que aparece na tela. Dash permite visualizações que não existem no catálogo padrão do Power BI: mapas de calor de correlação, gráficos de probabilidade, curvas de sobrevivência, plots de diagnóstico de modelos GLM. Qualquer visualização que o Plotly Express suporta está disponível com uma linha de código.
+
+Dash também é preferível quando o pipeline de dados é Python de ponta a ponta. Os dados que alimentam os gráficos são os mesmos objetos pandas que o modelo atuarial usa — não há uma camada de transformação extra, não há uma linguagem de consulta adicional (DAX) a aprender, não há risco de divergência entre o que o modelo calcula e o que o dashboard exibe. Em atuária isso importa: o gráfico de distribuição de benefícios no Dash usa exatamente o mesmo DataFrame que calcula a provisão matemática de benefícios a conceder.
+
+O deploy via Docker torna Dash uma escolha natural para sistemas que precisam rodar no servidor da EFPC, atrás do firewall corporativo, sem que nenhum dado de participante saia da rede interna. Power BI, mesmo com gateway on-premises, tem dependências de nuvem que podem conflitar com políticas de segurança de dados.
+
+Por último, Dash é open source e gratuito. O código de toda a camada de visualização está no repositório, é auditável, não tem licença por usuário e não muda de comportamento quando a Microsoft lança uma atualização.
+
+### Power BI é preferível quando
+
+O destinatário é um profissional de negócio sem conhecimento de Python — o gerente de benefícios, o diretor financeiro do fundo, o conselheiro deliberativo — que precisa explorar os dados por conta própria usando filtros visuais, drill-down e cruzamento de dimensões sem depender do atuário para rodar um script. O Power BI foi projetado para esse perfil de usuário e é genuinamente melhor nesse cenário.
+
+Power BI também é preferível quando a EFPC já tem licenças Microsoft 365 e Power BI Pro, e a equipe de TI já opera um gateway on-premises. Nesse caso o custo marginal de adicionar um relatório de crítica cadastral ao portfólio de relatórios existente é próximo de zero, e os gestores já sabem como usar a ferramenta.
+
+### O que este projeto demonstra sobre as ferramentas
+
+A decisão de implementar os dois caminhos não é redundância — é uma afirmação sobre reprodutibilidade. O dashboard Dash é o sistema operacional do atuário: rápido, preciso, controlável, versionável junto com o modelo. O projeto Power BI gerado por código é o sistema de comunicação com stakeholders: familiar para gestores, compartilhável via Power BI Service, navegável sem treinamento técnico.
+
+O fato de o relatório Power BI ser gerado pelo mesmo pipeline que valida os dados garante consistência: não é possível ter um dashboard Dash dizendo "63 inconsistências críticas" e um relatório Power BI dizendo "60". Os dois leem o mesmo arquivo.
 
 ---
 
-## Resultados (base demo — 930 participantes)
+## Estado atual e perspectivas do PBIR
 
-| Métrica | Valor |
-|---|---|
-| Inconsistências críticas | 63 |
-| Inconsistências alertas | 26 |
-| Razão assistidos/ativos | 0.417 (fundo maduro) |
-| Massa salarial mensal | R$ 14.7M |
-| Total benefícios/mês | R$ 3.2M |
-| Tempo de execução | ~2s |
+O **Power BI Enhanced Report Format (PBIR)** tornou-se o formato padrão para novos relatórios no Power BI Service em janeiro de 2026 e no Power BI Desktop a partir da versão de março de 2026. A Disponibilidade Geral (GA) está prevista para o terceiro trimestre de 2026, quando o formato legado deixará de ser suportado para novos desenvolvimentos.
+
+O significado prático é que o `powerbi_generator.py` deste projeto não é um experimento — é o caminho que a Microsoft está oficialmente adotando para desenvolvimento programático de relatórios. A documentação do PBIR é pública, os schemas JSON são versionados, e a Microsoft posiciona o PBIR explicitamente como "o formato que permite a agentes de IA e scripts criar, editar e gerenciar relatórios Power BI de forma completamente suportada".
+
+Para profissionais de ciências de dados e atuária, isso significa que a fronteira entre "escrever modelos em Python" e "construir relatórios para stakeholders no Power BI" está desaparecendo. Um pipeline como este — que vai de dados brutos do RH até um projeto Power BI funcional sem nenhum clique — é o que o ecossistema Microsoft está construindo infraestrutura para suportar em 2026.
+
+**Fonte:** Microsoft Power BI Blog, novembro de 2025 — "PBIR will become the default Power BI Report Format" (powerbi.microsoft.com/blog). Roadmap público: Microsoft Fabric Release Plan.
+
+---
+
+## Validações implementadas
+
+19 verificações cobrindo as três populações (ATIVO, ASSISTIDO, DIFERIDO):
+
+| Código | Tipo | Campo | Norma | Descrição |
+|---|---|---|---|---|
+| C001 | CRÍTICO | Campos obrigatórios | Res. PREVIC 7/2022, Art. 8 | DT_NASCIMENTO, CPF, SALARIO_CONTRIB ou DT_INICIO_BENEFICIO ausentes |
+| C002 | CRÍTICO | DT_NASCIMENTO | CPA 017/2019 | Data de nascimento inválida ou no futuro |
+| C003 | CRÍTICO | IDADE | AT-2000 / BR-EMS 2021 | Idade calculada fora do intervalo 0 a 120 anos |
+| C004 | CRÍTICO | DT_ADMISSAO_PLANO | Res. PREVIC 7/2022 | Admissão ao plano posterior à data-base da avaliação |
+| C005 | CRÍTICO | DT_NASCIMENTO | CPA 017/2019 | Ativo com 70 anos ou mais |
+| C006 | CRÍTICO | SALARIO_CONTRIB | Portaria MTE | Salário de contribuição abaixo do SMN vigente (R$ 1.412,00 em 2024) |
+| C007 | CRÍTICO | SEXO | BR-EMS 2021 | Sexo inválido — BR-EMS 2021 diferencia até 16% entre sexos |
+| C008 | CRÍTICO | CPF | Receita Federal | CPF com formato inválido |
+| C009 | CRÍTICO | CPF | Res. PREVIC 7/2022 | CPF duplicado na base |
+| C010 | CRÍTICO | DT_INICIO_BENEFICIO | CPA 017/2019 | Data de início do benefício posterior à data-base |
+| C011 | CRÍTICO | BENEFICIO_MENSAL | Res. PREVIC 7/2022 | Benefício mensal nulo ou negativo para assistido |
+| A001 | ALERTA | IDADE | AT-2000 | Ativo com mais de 80 anos |
+| A002 | ALERTA | DT_ADMISSAO_PLANO | CPA 017/2019 | Admissão ao plano há menos de 6 meses |
+| A003 | ALERTA | SALARIO_CONTRIB | CPA 017/2019 | Salário acima do percentil 97 da base |
+| A004 | ALERTA | DT_NASCIMENTO | CPA 017/2019 | Menor de 16 anos como ativo |
+| A005 | ALERTA | TEMPO_PLANO | CPA 017/2019 | Tempo de plano acima de 45 anos |
+| A006 | ALERTA | DT_INICIO_BENEFICIO | Res. PREVIC 7/2022 | Benefício iniciado há menos de 30 dias |
+| A007 | ALERTA | IDADE | BR-EMS 2021 | Assistido com menos de 50 anos |
+| A008 | ALERTA | SALDO_CONTA | Res. PREVIC 7/2022 | Diferido com saldo de conta zero ou negativo |
+
+---
+
+## Resultados com base demo
+
+Base demo gerada automaticamente: 930 participantes (600 ativos, 250 assistidos, 80 diferidos), data-base 31/12/2024.
+
+```
+Inconsistências detectadas : 89
+  CRÍTICAS                  : 63   (70,8% do total)
+  ALERTAS                   : 26   (29,2% do total)
+
+Tempo de execução           : ~2 segundos
+Participantes sem problemas : 841 (90,4% da base)
+
+KPIs populacionais:
+  Média de idade — Ativos     : 45,3 anos
+  Salário médio               : R$ 25.022
+  Massa salarial total        : R$ 14.712.739/mês
+  Média de idade — Assistidos : 72,2 anos
+  Benefício médio             : R$ 12.970/mês
+  Total de benefícios         : R$ 3.242.412/mês
+  Razão Assistidos/Ativos     : 0,417 (fundo maduro acima de 0,40)
+```
 
 ---
 
@@ -227,43 +312,71 @@ python src/powerbi_generator.py     # gera relatório Power BI por código
 
 ```
 cadastral-actuarial-pipeline/
-│
-├── Dockerfile                    ← imagem Docker para deploy empresarial
-├── docker-compose.yml            ← sobe tudo com 1 comando
-├── requirements.txt
-├── README.md
-│
 ├── src/
-│   ├── pipeline.py               ← entry point CLI
-│   ├── generate_data.py          ← gerador de base demo (930 participantes)
-│   ├── validator.py              ← 19 verificações regulatórias
-│   └── report_generator.py      ← Excel atuarial + Power BI flat tables
-│
+│   ├── pipeline.py              ← entrada CLI: --demo ou --input arquivo.xlsx
+│   ├── generate_data.py         ← gerador de dados sintéticos para demo
+│   ├── validator.py             ← 19 verificações regulatórias
+│   ├── report_generator.py      ← gera os dois Excels e as 7 abas do Power BI
+│   └── powerbi_generator.py     ← gera 47 arquivos PBIP/PBIR por código Python
 ├── app/
-│   ├── dashboard.py              ← Plotly Dash 4 (4 páginas, dark theme)
-│   └── assets/style.css
-│
+│   ├── dashboard.py             ← Plotly Dash 4, 4 páginas, dcc.Location routing
+│   └── assets/style.css         ← tema dark, variáveis CSS
 ├── powerbi/
 │   └── INSTRUCOES_POWER_BI.md
-│
-└── data/
-    ├── raw/                      ← base recebida do RH (.xlsx)
-    └── processed/
+├── results/
+│   └── reports/                 ← saída do pipeline (gitignored com dados reais)
+├── docs/                        ← screenshots e diagrama de arquitetura
+├── Dockerfile
+├── docker-compose.yml
+└── requirements.txt
 ```
 
 ---
 
-## Referências regulatórias
+## Como usar com dados reais
 
-- **Resolução PREVIC nº 7/2022, Art. 8** — dados cadastrais em planilha eletrônica
-- **Resolução PREVIC nº 23/2023** — norma consolidada EFPC
-- **CPA 017/2019 IBA** — Auditoria Atuarial: crítica cadastral é o primeiro passo
-- **CPAO 035 IBA** — Reservas Matemáticas (PMBaC, PMBC, método PUC)
-- **CLT Art. 403** — idade mínima de trabalho (16 anos)
+```bash
+# Pipeline com planilha real da EFPC
+python src/pipeline.py --input caminho/para/base_rh.xlsx --output results/reports
+
+# O pipeline espera três abas na planilha:
+#   ATIVOS      — colunas: ID_PARTICIPANTE, CPF, DT_NASCIMENTO, SEXO, CARGO,
+#                           SALARIO_CONTRIB, DT_ADMISSAO_PLANO, SITUACAO
+#   ASSISTIDOS  — colunas: ID_PARTICIPANTE, CPF, DT_NASCIMENTO, SEXO, TIPO_BENEFICIO,
+#                           BENEFICIO_MENSAL, DT_INICIO_BENEFICIO, SITUACAO
+#   DIFERIDOS   — colunas: ID_PARTICIPANTE, CPF, DT_NASCIMENTO, SEXO,
+#                           SALDO_CONTA, SITUACAO
+
+# Após o pipeline, gerar o projeto Power BI
+python src/powerbi_generator.py --input results/reports/powerbi_data.xlsx
+```
+
+---
+
+## Referências regulatórias e técnicas
+
+**Resolução PREVIC nº 7, de 10 de novembro de 2022.** Dispõe sobre os procedimentos e os parâmetros técnico-atuariais para a estruturação, a execução e a divulgação das avaliações atuariais dos planos de benefícios administrados pelas EFPC. Disponível em: previc.gov.br/legislacao/resolucoes.
+
+**CPA 017/2019 — Comunicado de Pronunciamento Atuarial do IBA.** Pronunciamento sobre a atividade de atuária independente e a crítica de base de dados em fundos de pensão. Instituto Brasileiro de Atuária. Disponível em: ibaatuarios.org.br.
+
+**Nota Técnica AT-2000.** Tábua de mortalidade derivada da população segurada brasileira, utilizada na ausência de estudo de experiência própria.
+
+**BR-EMS 2021.** Tábua de mortalidade para seguros de vida com diferenciação por sexo, atualizada pela FenaPrevi e CNSEG com dados de 2010 a 2016.
+
+**Portaria MTE nº 3.659/2023.** Define o Salário Mínimo Nacional vigente em 2024 (R$ 1.412,00).
+
+**powerbpy v0.2.0.** Biblioteca Python de código aberto para geração programática de projetos Power BI PBIP/PBIR. A estrutura de visuais, schemas e formato dos arquivos `visual.json` neste projeto foi derivada do código-fonte desta biblioteca. Repositório: github.com/Russell-Shean/powerbpy.
+
+**Microsoft Power BI Blog.** "PBIR will become the default Power BI Report Format", novembro de 2025. Disponível em: powerbi.microsoft.com/blog.
+
+**Microsoft Learn.** "Create a Power BI report in enhanced report format". Documentação oficial do PBIR. Disponível em: learn.microsoft.com/power-bi/developer/embedded/projects-enhanced-report-format.
+
+**Plotly Dash documentation.** "Dash in 20 Minutes". Disponível em: dash.plotly.com.
 
 ---
 
 ## Autor
 
-Arthur Motta — Ciências Atuariais e Estatística, UFRJ
-[GitHub](https://github.com/arthurpmotta02) · [LinkedIn](https://linkedin.com/in/arthurpmotta)
+**Arthur Motta** — Graduando em Ciências Atuariais e Estatística pela UFRJ. Interesse em atuária de previdência complementar, processos estocásticos e aplicações de ciência de dados em seguros e fundos de pensão.
+
+GitHub: [arthurpmotta02](https://github.com/arthurpmotta02) | LinkedIn: linkedin.com/in/arthurpmotta

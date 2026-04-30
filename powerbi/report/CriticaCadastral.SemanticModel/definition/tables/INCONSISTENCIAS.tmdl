@@ -1,0 +1,27 @@
+table INCONSISTENCIAS
+    annotation PBI_ResultType = Table
+
+    partition INCONSISTENCIAS-partition = m
+        mode: import
+        source =
+            let
+                    src = Excel.Workbook(File.Contents("C:/Users/Arthur/Documents/VS Code/Projetos/cadastral-actuarial-pipeline/results/reports/powerbi_data.xlsx"), null, true),
+                    sheet = src{[Item="INCONSISTENCIAS",Kind="Sheet"]}[Data],
+                    promoted = Table.PromoteHeaders(sheet, [PromoteAllScalars=true])
+            in
+                    promoted
+
+    column ID_PARTICIPANTE
+        dataType: string
+    column GRUPO
+        dataType: string
+    column CAMPO
+        dataType: string
+    column VALOR_ATUAL
+        dataType: string
+    column SEVERIDADE
+        dataType: string
+    column CODIGO
+        dataType: string
+    column DESCRICAO
+        dataType: string

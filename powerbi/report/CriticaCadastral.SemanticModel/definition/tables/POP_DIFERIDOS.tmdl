@@ -1,0 +1,19 @@
+table POP_DIFERIDOS
+    annotation PBI_ResultType = Table
+
+    partition POP_DIFERIDOS-partition = m
+        mode: import
+        source =
+            let
+                    src = Excel.Workbook(File.Contents("C:/Users/Arthur/Documents/VS Code/Projetos/cadastral-actuarial-pipeline/results/reports/powerbi_data.xlsx"), null, true),
+                    sheet = src{[Item="POP_DIFERIDOS",Kind="Sheet"]}[Data],
+                    promoted = Table.PromoteHeaders(sheet, [PromoteAllScalars=true])
+            in
+                    promoted
+
+    column ID_PARTICIPANTE
+        dataType: string
+    column SALDO_CONTA
+        dataType: double
+    column SITUACAO_GRUPO
+        dataType: string

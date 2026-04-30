@@ -274,14 +274,29 @@ def build_powerbi_export(df_a, df_s, df_d, all_issues, summ,
     freq["PCT_TOTAL"] = (freq["OCORRENCIAS"] / len(all_issues) * 100).round(1)
 
     # KPI summary as flat table (1 row per metric — Power BI card visuals)
-    kpi = pd.DataFrame([
-        {"INDICADOR": k, "VALOR": v} for k, v in summ.items()
-    ])
+    # POPULACAO_TOTAL — combined table for cross-group charts (Composição da População)
+    pop_cols = ["ID_PARTICIPANTE", "SITUACAO_GRUPO", "FAIXA_ETARIA", "IDADE"]
+    def _pick(df, cols):
+        return df[[c for c in cols if c in df.columns]].copy()
+    pop_total = pd.concat([
+        _pick(df_a_enr, pop_cols).assign(SITUACAO_GRUPO="ATIVO"),
+        _pick(df_s_enr, pop_cols).assign(SITUACAO_GRUPO="ASSISTIDO"),
+        _pick(df_d_enr, pop_cols).assign(SITUACAO_GRUPO="DIFERIDO"),
+    ], ignore_index=True)
+
+    # SUMARIO_KPI: wide format (1 row, each KPI as its own column)
+    # This allows Power BI visuals to bind directly to column names
+    # e.g. card visual binds to column "n_total" instead of filtering INDICADOR="n_total"
+    kpi_wide = dict(summ)
+    kpi_wide["n_criticos"] = int((all_issues["SEVERIDADE"] == "CRITICO").sum())
+    kpi_wide["n_alertas"]  = int((all_issues["SEVERIDADE"] == "ALERTA").sum())
+    kpi = pd.DataFrame([kpi_wide])
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as w:
         df_a_enr.to_excel(w, sheet_name="POP_ATIVOS",        index=False)
         df_s_enr.to_excel(w, sheet_name="POP_ASSISTIDOS",    index=False)
         df_d_enr.to_excel(w, sheet_name="POP_DIFERIDOS",     index=False)
+        pop_total.to_excel(w, sheet_name="POPULACAO_TOTAL",  index=False)
         all_issues.to_excel(w, sheet_name="INCONSISTENCIAS", index=False)
         freq.to_excel(w, sheet_name="FREQ_INCONSISTENCIAS",  index=False)
         kpi.to_excel(w, sheet_name="SUMARIO_KPI",            index=False)

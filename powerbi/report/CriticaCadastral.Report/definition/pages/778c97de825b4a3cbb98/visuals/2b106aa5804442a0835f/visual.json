@@ -1,0 +1,134 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.3.0/schema.json",
+  "name": "2b106aa5804442a0835f",
+  "position": {
+    "x": 10,
+    "y": 115,
+    "z": 6000,
+    "height": 270,
+    "width": 620,
+    "tabOrder": -1001
+  },
+  "visual": {
+    "visualType": "clusteredColumnChart",
+    "objects": {},
+    "visualContainerObjects": {
+      "general": [
+        {
+          "properties": {
+            "altText": {
+              "expr": {
+                "Literal": {
+                  "Value": "''"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Distribuição Etária — Assistidos'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "POP_ASSISTIDOS"
+                    }
+                  },
+                  "Property": "FAIXA_ETARIA"
+                }
+              },
+              "queryRef": "POP_ASSISTIDOS.FAIXA_ETARIA",
+              "nativeQueryRef": "FAIXA_ETARIA",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "POP_ASSISTIDOS"
+                        }
+                      },
+                      "Property": "ID_PARTICIPANTE"
+                    }
+                  },
+                  "Function": 5
+                }
+              },
+              "queryRef": "CountNonNull(POP_ASSISTIDOS.ID_PARTICIPANTE)",
+              "nativeQueryRef": "CountNonNull of ID_PARTICIPANTE"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Aggregation": {
+                "Expression": {
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "POP_ASSISTIDOS"
+                      }
+                    },
+                    "Property": "ID_PARTICIPANTE"
+                  }
+                },
+                "Function": 5
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    }
+  }
+}

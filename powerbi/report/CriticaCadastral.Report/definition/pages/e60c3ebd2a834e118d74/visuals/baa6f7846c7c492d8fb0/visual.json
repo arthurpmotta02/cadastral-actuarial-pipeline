@@ -1,0 +1,134 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.3.0/schema.json",
+  "name": "baa6f7846c7c492d8fb0",
+  "position": {
+    "x": 10,
+    "y": 400,
+    "z": 6000,
+    "height": 290,
+    "width": 1260,
+    "tabOrder": -1001
+  },
+  "visual": {
+    "visualType": "clusteredColumnChart",
+    "objects": {},
+    "visualContainerObjects": {
+      "general": [
+        {
+          "properties": {
+            "altText": {
+              "expr": {
+                "Literal": {
+                  "Value": "''"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Salário por Faixa Etária'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "POP_ATIVOS"
+                    }
+                  },
+                  "Property": "FAIXA_ETARIA"
+                }
+              },
+              "queryRef": "POP_ATIVOS.FAIXA_ETARIA",
+              "nativeQueryRef": "FAIXA_ETARIA",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "POP_ATIVOS"
+                        }
+                      },
+                      "Property": "ID_PARTICIPANTE"
+                    }
+                  },
+                  "Function": 5
+                }
+              },
+              "queryRef": "CountNonNull(POP_ATIVOS.ID_PARTICIPANTE)",
+              "nativeQueryRef": "CountNonNull of ID_PARTICIPANTE"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Aggregation": {
+                "Expression": {
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "POP_ATIVOS"
+                      }
+                    },
+                    "Property": "ID_PARTICIPANTE"
+                  }
+                },
+                "Function": 5
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    }
+  }
+}

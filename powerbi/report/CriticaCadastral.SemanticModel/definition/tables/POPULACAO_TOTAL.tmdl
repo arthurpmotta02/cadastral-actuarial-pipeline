@@ -1,0 +1,21 @@
+table POPULACAO_TOTAL
+    annotation PBI_ResultType = Table
+
+    partition POPULACAO_TOTAL-partition = m
+        mode: import
+        source =
+            let
+                    src = Excel.Workbook(File.Contents("C:/Users/Arthur/Documents/VS Code/Projetos/cadastral-actuarial-pipeline/results/reports/powerbi_data.xlsx"), null, true),
+                    sheet = src{[Item="POPULACAO_TOTAL",Kind="Sheet"]}[Data],
+                    promoted = Table.PromoteHeaders(sheet, [PromoteAllScalars=true])
+            in
+                    promoted
+
+    column ID_PARTICIPANTE
+        dataType: string
+    column SITUACAO_GRUPO
+        dataType: string
+    column FAIXA_ETARIA
+        dataType: string
+    column IDADE
+        dataType: double

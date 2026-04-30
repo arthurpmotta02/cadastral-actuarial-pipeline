@@ -1,0 +1,134 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.3.0/schema.json",
+  "name": "54e3d53dc26e42359ecb",
+  "position": {
+    "x": 650,
+    "y": 115,
+    "z": 6000,
+    "height": 280,
+    "width": 620,
+    "tabOrder": -1001
+  },
+  "visual": {
+    "visualType": "clusteredColumnChart",
+    "objects": {},
+    "visualContainerObjects": {
+      "general": [
+        {
+          "properties": {
+            "altText": {
+              "expr": {
+                "Literal": {
+                  "Value": "''"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Composição da População'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "POPULACAO_TOTAL"
+                    }
+                  },
+                  "Property": "SITUACAO_GRUPO"
+                }
+              },
+              "queryRef": "POPULACAO_TOTAL.SITUACAO_GRUPO",
+              "nativeQueryRef": "SITUACAO_GRUPO",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "POPULACAO_TOTAL"
+                        }
+                      },
+                      "Property": "ID_PARTICIPANTE"
+                    }
+                  },
+                  "Function": 5
+                }
+              },
+              "queryRef": "CountNonNull(POPULACAO_TOTAL.ID_PARTICIPANTE)",
+              "nativeQueryRef": "CountNonNull of ID_PARTICIPANTE"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Aggregation": {
+                "Expression": {
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "POPULACAO_TOTAL"
+                      }
+                    },
+                    "Property": "ID_PARTICIPANTE"
+                  }
+                },
+                "Function": 5
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+table SUMARIO_KPI
+    annotation PBI_ResultType = Table
+
+    partition SUMARIO_KPI-partition = m
+        mode: import
+        source =
+            let
+                    src = Excel.Workbook(File.Contents("C:/Users/Arthur/Documents/VS Code/Projetos/cadastral-actuarial-pipeline/results/reports/powerbi_data.xlsx"), null, true),
+                    sheet = src{[Item="SUMARIO_KPI",Kind="Sheet"]}[Data],
+                    promoted = Table.PromoteHeaders(sheet, [PromoteAllScalars=true]),
+                    typed = Table.TransformColumnTypes(promoted, { {"n_ativos", type number}, {"n_assistidos", type number}, {"n_diferidos", type number}, {"n_total", type number}, {"n_criticos", type number}, {"n_alertas", type number}, {"ativos_media_idade", type number}, {"ativos_media_salario", type number}, {"ativos_total_massa", type number}, {"assistidos_media_idade", type number}, {"assistidos_media_beneficio", type number}, {"assistidos_total_beneficio", type number}, {"razao_assistidos_ativos", type number} })
+            in
+                    typed
+
+    column data_base
+        dataType: string
+    column n_ativos
+        dataType: int64
+    column n_assistidos
+        dataType: int64
+    column n_diferidos
+        dataType: int64
+    column n_total
+        dataType: int64
+    column n_criticos
+        dataType: int64
+    column n_alertas
+        dataType: int64
+    column ativos_media_idade
+        dataType: double
+    column ativos_media_salario
+        dataType: double
+    column ativos_total_massa
+        dataType: double
+    column assistidos_media_idade
+        dataType: double
+    column assistidos_media_beneficio
+        dataType: double
+    column assistidos_total_beneficio
+        dataType: double
+    column razao_assistidos_ativos
+        dataType: double
