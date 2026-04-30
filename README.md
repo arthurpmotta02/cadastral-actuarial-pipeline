@@ -20,8 +20,6 @@ Este pipeline automatiza as 19 verificações regulatórias em uma passagem úni
 
 ## Arquitetura do pipeline
 
-![Pipeline](docs/pipeline_diagram.png)
-
 O fluxo começa em qualquer planilha do RH e termina em relatórios atuariais, dashboards e um projeto Power BI completamente funcional, tudo gerado por código, sem interação humana.
 
 ```
