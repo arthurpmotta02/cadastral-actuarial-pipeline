@@ -29,6 +29,28 @@ Na prática esse processo é feito manualmente em Excel. Este pipeline automatiz
 
 ---
 
+## Screenshots
+
+**Visão Geral** — KPIs de população, inconsistências por código e composição da base
+![Visão Geral](docs/visao_geral.png)
+
+**Inconsistências** — frequência por código e tabela completa com badges CRÍTICO/ALERTA
+![Inconsistências](docs/inconsistencias.png)
+
+**Ativos** — distribuição etária, salarial, scatter idade × salário e breakdown por cargo
+![Ativos](docs/ativos.png)
+
+**Assistidos** — distribuição etária, de benefícios, por tipo e scatter idade × benefício
+![Assistidos](docs/assistidos.png)
+
+---
+
+## Arquitetura do pipeline
+
+![Pipeline](docs/pipeline_diagram.png)
+
+---
+
 ## Início rápido
 
 ### Opção A — Python direto
@@ -99,79 +121,66 @@ Ver `powerbi/INSTRUCOES_POWER_BI.md` para passo a passo completo com:
 
 ---
 
-## Por que Power BI point-and-click não é estado da arte — e o que vem por aí
+## Por que Power BI point-and-click não é estado da arte
 
-Esta seção existe porque o projeto entrega um `powerbi_data.xlsx` pronto para importação manual no Power BI Desktop, e é importante ser honesto sobre o que isso significa tecnicamente: é uma concessão à realidade do mercado corporativo brasileiro atual, não uma escolha de engenharia ideal. O argumento a seguir documenta o estado da arte de 2026 e o caminho que este projeto seguirá quando as ferramentas amadurecerem.
+Este projeto exporta um `powerbi_data.xlsx` pronto para importação manual no Power BI Desktop. Vale ser honesto sobre o que isso significa tecnicamente: é uma concessão à realidade do mercado corporativo brasileiro atual, não uma escolha de engenharia ideal. A seção abaixo documenta por que ferramentas de BI puramente visuais têm limitações estruturais sérias, o que o ecossistema está fazendo para resolvê-las, e o caminho que este projeto seguirá quando as ferramentas amadurecerem.
 
-### O problema fundamental do Power BI como ferramenta point-and-click
+### O problema do arquivo binário e da memória humana
 
-Qualquer ferramenta de BI que exige que um humano arraste visuais, configure relacionamentos manualmente e salve um arquivo binário para gerar um relatório viola um princípio básico da engenharia de software moderna: **reprodutibilidade**. Se o processo de criação de um artefato não pode ser descrito integralmente em código, ele não pode ser versionado, testado, revisado em pull request, auditado, ou reproduzido de forma idêntica por outra pessoa em outra máquina. Ele existe apenas na cabeça de quem clicou.
+Qualquer ferramenta de BI que exige que um humano arraste visuais, configure relacionamentos manualmente e salve um arquivo binário viola um princípio básico da engenharia de software: **reprodutibilidade**. Se o processo de criação de um artefato não pode ser descrito integralmente em código, ele não pode ser versionado, testado, revisado em pull request, auditado, ou reproduzido de forma idêntica por outra pessoa em outra máquina. O conhecimento existe na memória de quem clicou, não no repositório.
 
-Isso tem consequências práticas diretas no contexto de uma EFPC:
+No contexto de uma EFPC isso tem consequências concretas.
 
-**1. Ausência de versionamento real.** Um arquivo `.pbix` é um ZIP binário. Fazer `git diff` num `.pbix` não produz nenhuma informação útil — o Git trata o arquivo como um blob opaco. Isso significa que não existe registro legível de quais medidas DAX foram alteradas entre a avaliação atuarial de dezembro e a de março, qual visual foi adicionado e por quê, ou quem mudou qual filtro. Em auditoria atuarial — onde rastreabilidade é um requisito regulatório explícito — isso é uma falha estrutural, não um detalhe cosmético.
+**Versionamento inexistente.** Um arquivo `.pbix` é um ZIP binário. Executar `git diff` num `.pbix` não produz nenhuma informação útil — o Git trata o arquivo como um blob opaco. Não existe registro legível de quais medidas DAX foram alteradas entre a avaliação atuarial de dezembro e a de março, qual visual foi adicionado e por quê, ou quem mudou qual filtro. Em auditoria atuarial, onde rastreabilidade é um requisito regulatório explícito da Resolução PREVIC 7/2022, isso é uma falha estrutural.
 
-**2. Irreprodutibildade sistêmica.** Se o analista que montou o relatório sair da empresa, a capacidade de reproduzir aquele dashboard exato vai junto. O conhecimento está no clique, não no código. Não existe um `README.md` que descreva "execute esses passos e você terá o mesmo resultado". Em contraste, o pipeline Python deste projeto pode ser executado por qualquer pessoa com `python src/pipeline.py --demo` e produzirá exatamente os mesmos outputs em qualquer máquina — isso é reprodutibilidade.
+**Irreprodutibildade sistêmica.** Se o analista que montou o relatório sair da empresa, a capacidade de reproduzir aquele dashboard vai junto. Não existe um script que descreva "execute esses comandos e você terá o mesmo resultado". Em contraste, este pipeline pode ser executado com `python src/pipeline.py --demo` por qualquer pessoa em qualquer máquina e produzirá outputs idênticos — essa é a definição de reprodutibilidade.
 
-**3. Impossibilidade de CI/CD.** Ferramentas de BI point-and-click não se integram naturalmente a pipelines de integração contínua. Não existe um comando `powerbi build --validate` que você pode rodar no GitHub Actions para garantir que o relatório está consistente com os dados antes de cada deploy. O resultado é que mudanças nos dados (um novo campo no cadastro, uma nova situação regulatória adicionada pela PREVIC) exigem intervenção manual no relatório — um ponto de falha humano.
+**Integração contínua impossível.** Ferramentas de BI visuais não se integram a pipelines de CI/CD. Não existe um comando `powerbi build --validate` que roda no GitHub Actions para garantir que o relatório está consistente com os dados antes de cada deploy. Toda mudança nos dados, seja um novo campo no cadastro ou uma nova situação regulatória adicionada pela PREVIC, exige intervenção manual no relatório.
 
-**4. Colaboração impossível em equipes.** Dois analistas não conseguem trabalhar simultaneamente no mesmo `.pbix` sem sobrescrever o trabalho um do outro. A solução usual — "fulano trabalha no relatório enquanto cicrano não mexe" — é o equivalente a desenvolver software sem controle de versão. Em qualquer equipe de engenharia de software isso seria inaceitável.
+**Colaboração travada.** Dois analistas não conseguem trabalhar simultaneamente no mesmo `.pbix` sem sobrescrever o trabalho um do outro. A solução usual nas empresas ("fulano trabalha enquanto cicrano não mexe") é o equivalente a desenvolver software sem controle de versão. Qualquer equipe de engenharia de software rejeitaria esse fluxo imediatamente.
 
-**5. Acoplamento a licença proprietária.** O `.pbix` só abre no Power BI Desktop, que só roda no Windows, que exige conta Microsoft ativa. O Dash roda em qualquer sistema operacional, em qualquer browser, sem licença, com `python app/dashboard.py`.
+**Acoplamento a licença e sistema operacional.** O `.pbix` só abre no Power BI Desktop, que só roda em Windows, que exige conta Microsoft ativa. O Dash deste projeto roda em qualquer sistema operacional, em qualquer browser, sem licença, com `python app/dashboard.py`.
 
-### O que o mercado está fazendo para resolver isso
+### O que o mercado está construindo para resolver isso
 
-A Microsoft reconheceu explicitamente esses problemas e está construindo uma solução. O estado da arte em 2026 é composto de três tecnologias complementares:
+A Microsoft reconheceu esses problemas. O estado da arte em 2026 envolve três tecnologias que juntas movem o Power BI de ferramenta visual para infraestrutura de código.
 
-**PBIR — Power BI Enhanced Report Format**
-Lançado em preview em 2024 e tornado padrão em janeiro de 2026 para o Power BI Service (com Power BI Desktop seguindo em março de 2026), o PBIR decompõe o arquivo monolítico `.pbix` em uma estrutura de pastas com arquivos JSON individuais para cada página, visual, bookmark e interação. Cada arquivo tem um schema JSON público e documentado pela Microsoft. Isso significa que, pela primeira vez, é possível fazer `git diff` em um relatório Power BI e ver exatamente qual propriedade de qual visual mudou. É Power BI finalmente tratando relatórios como código.
+**PBIR (Power BI Enhanced Report Format)** decompõe o arquivo monolítico `.pbix` em uma estrutura de pastas com arquivos JSON individuais para cada página, visual, bookmark e interação. Cada arquivo tem um schema JSON público documentado pela Microsoft. Tornou-se o formato padrão do Power BI Service em janeiro de 2026 e do Power BI Desktop em março de 2026. Pela primeira vez é possível fazer `git diff` num relatório Power BI e ver exatamente qual propriedade de qual visual mudou. Fonte: [Microsoft Learn, Power BI Enhanced Report Format](https://learn.microsoft.com/en-us/power-bi/developer/embedded/projects-enhanced-report-format).
 
-Fonte: [Microsoft Learn — Power BI Enhanced Report Format](https://learn.microsoft.com/en-us/power-bi/developer/embedded/projects-enhanced-report-format)
+**PBIP (Power BI Project)** organiza o PBIR e o TMDL (modelo semântico como texto) em uma estrutura de diretórios versionável com Git. Um relatório Power BI passa a ser um repositório como qualquer outro projeto de software, com histórico de commits, branches e pull requests. Fonte: [Microsoft Learn, Power BI Desktop Projects](https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-overview).
 
-**PBIP — Power BI Project**
-O formato de projeto que organiza o PBIR (relatório) e o TMDL (modelo semântico) em uma estrutura de diretórios versionável. Com PBIP, um relatório Power BI passa a ser um repositório Git como qualquer outro projeto de software — com histórico, branches, pull requests e merge conflicts resolvíveis.
-
-Fonte: [Microsoft Learn — Power BI Desktop Projects](https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-overview)
-
-**`powerbpy` — geração programática de relatórios Power BI via Python**
-Biblioteca Python open-source que gera a estrutura PBIP/PBIR inteiramente por código, sem abrir o Power BI Desktop. O resultado pode ser aberto e editado normalmente no Desktop, e versionado no Git como qualquer outro arquivo de texto.
-
-Fonte: [powerbpy no PyPI](https://pypi.org/project/powerbpy/)
+**`powerbpy`** é uma biblioteca Python open-source que gera a estrutura PBIP/PBIR inteiramente por código, sem abrir o Power BI Desktop. O resultado pode ser aberto e editado normalmente no Desktop, e versionado no Git como qualquer arquivo de texto. Fonte: [powerbpy no PyPI](https://pypi.org/project/powerbpy/).
 
 ### Por que este projeto ainda não usa essas ferramentas
 
-A resposta é direta: o PBIR ainda está em preview. A Microsoft adverte explicitamente que a especificação pode mudar antes do GA (previsto para Q3 2026), e o `powerbpy` é um projeto de desenvolvedor independente cujo roadmap depende da estabilidade do PBIR. Construir um pipeline de produção sobre uma especificação em preview seria trocar um problema (point-and-click não reprodutível) por outro (código que quebra quando a Microsoft muda a spec).
+O PBIR ainda está em preview. A Microsoft adverte que a especificação pode mudar antes do GA previsto para Q3 2026, e o `powerbpy` é um projeto de desenvolvedor independente cujo roadmap depende da estabilidade do PBIR. Construir um pipeline de produção sobre especificação em preview seria trocar um problema (relatório não reprodutível) por outro (código que quebra quando a Microsoft muda a spec antes do GA).
 
-A escolha pragmática — exportar `powerbi_data.xlsx` bem estruturado para importação manual — é a decisão correta para o momento. Ela satisfaz o requisito real (analistas de EFPC que precisam de Power BI hoje) sem amarrar o projeto a uma tecnologia instável.
+Exportar `powerbi_data.xlsx` bem estruturado para importação manual é a decisão pragmaticamente correta para o momento: satisfaz o requisito real dos analistas de EFPC que precisam de Power BI hoje, sem amarrar o projeto a tecnologia instável.
 
 ### O que este projeto fará quando o PBIR atingir GA
 
-Assim que o PBIR sair de preview (previsão Q3 2026), este projeto será atualizado com:
+Assim que o PBIR sair de preview (previsão Q3 2026), o projeto será atualizado com um gerador programático:
 
 ```
 src/
-└── powerbi_generator.py   ← gera a estrutura PBIP/PBIR
-                              inteiramente por Python, sem abrir o Desktop
-                              usando powerbpy + manipulação direta dos JSON PBIR
+└── powerbi_generator.py   -- gera estrutura PBIP/PBIR por Python
+                              sem abrir o Power BI Desktop
+                              usando powerbpy + edição direta dos JSON PBIR
 
 powerbi/
-├── INSTRUCOES_POWER_BI.md  ← mantido para quem preferir o fluxo manual
-└── report/                 ← estrutura PBIP gerada automaticamente
+├── INSTRUCOES_POWER_BI.md  -- mantido para quem preferir o fluxo manual
+└── report/                 -- gerado automaticamente pelo script
     ├── definition.pbir
     ├── pages/
     └── visuals/
 ```
 
-O pipeline passará a ser:
+O pipeline passará a ser completamente reprodutível de ponta a ponta:
 
 ```bash
-python src/pipeline.py --demo        # gera dados + relatório Excel
-python src/powerbi_generator.py      # gera relatório Power BI por código
-# Resultado: pasta powerbi/report/ pronta para abrir no Desktop
-# ou fazer push via Fabric Git Integration
+python src/pipeline.py --demo       # valida dados, gera Excels
+python src/powerbi_generator.py     # gera relatório Power BI por código
 ```
-
-Isso fechará o ciclo de reprodutibilidade completa: de dados brutos a relatório Power BI, tudo em código, tudo versionado, tudo executável com um comando.
 
 ---
 
